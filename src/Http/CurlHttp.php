@@ -1,0 +1,285 @@
+<?php
+
+namespace Codebrainbv\Smartpay\Http;
+
+use Codebrainbv\Smartpay\CodebrainPycApiClient;
+use Codebrainbv\Smartpay\Exceptions\ApiException;
+use Codebrainbv\Smartpay\Exceptions\CurlException;
+use Composer\CaBundle\CaBundle;
+use GuzzleHttp\Psr7\Response;
+use Psr\Http\Message\ResponseInterface;
+
+final class CurlHttp implements HttpInterface
+{
+    /**
+     * Default response timeout (in seconds).
+     */
+    public const DEFAULT_TIMEOUT = 10;
+
+    /**
+     * Default connect timeout (in seconds).
+     */
+    public const DEFAULT_CONNECT_TIMEOUT = 2;
+
+    /**
+     * HTTP status code for an empty ok response.
+     */
+    public const HTTP_NO_CONTENT = 204;
+
+    /**
+     * The maximum number of retries.
+     */
+    public const MAX_RETRIES = 5;
+
+    /**
+     * The amount of milliseconds the delay is being increased with on each retry.
+     */
+    public const DELAY_INCREASE_MS = 1000;
+
+    /**
+     * @param string $httpMethod
+     * @param string $url
+     * @param array  $headers
+     * @param string $httpBody
+     *
+     * @return \Psr\Http\Message\ResponseInterface|null
+     *
+     * @throws \Codebrainbv\Smartpay\Exceptions\ApiException
+     * @throws \Codebrainbv\Smartpay\Exceptions\CurlException
+     */
+    public function send($httpMethod, $url, $headers, $httpBody): ?ResponseInterface
+    {
+        for ($i = 0; $i <= self::MAX_RETRIES; ++$i) {
+            usleep($i * self::DELAY_INCREASE_MS);
+
+            try {
+                return $this->attemptRequest($httpMethod, $url, $headers, $httpBody);
+            } catch (CurlException $e) {
+                throw new CurlException($e->getMessage());
+            }
+        }
+
+        throw new CurlException('Unable to connect to the Codebrain HUB. Maximum number of retries (' . self::MAX_RETRIES . ') reached.');
+    }
+
+    /**
+     * @param string $httpMethod
+     * @param string $url
+     * @param array  $headers
+     * @param string $httpBody
+     *
+     * @return \stdClass|void|null
+     *
+     * @throws \Codebrainbv\Smartpay\Exceptions\ApiException
+     */
+    private function attemptRequest($httpMethod, $url, $headers, $httpBody)
+    {
+        // Validate input parameters
+        if (empty($httpMethod)) {
+            throw new ApiException('HTTP method cannot be empty.');
+        }
+
+        if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+            throw new ApiException('Invalid or empty URL provided.');
+        }
+
+        $curl = curl_init($url);
+        if ($curl === false) {
+            throw new CurlException('Failed to initialize cURL session.');
+        }
+
+        $headers['Content-Type'] = 'application/json';
+
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($curl, CURLOPT_HTTPHEADER, $this->parseHeaders($headers));
+        curl_setopt($curl, CURLOPT_CONNECTTIMEOUT, self::DEFAULT_CONNECT_TIMEOUT);
+        curl_setopt($curl, CURLOPT_TIMEOUT, self::DEFAULT_TIMEOUT);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($curl, CURLOPT_HEADER, true);
+        curl_setopt($curl, CURLOPT_CAINFO, CaBundle::getBundledCaBundlePath());
+
+        switch ($httpMethod) {
+            case CodebrainPycApiClient::HTTP_POST:
+                curl_setopt($curl, CURLOPT_POST, true);
+                curl_setopt($curl, CURLOPT_POSTFIELDS, $httpBody);
+
+                break;
+            case CodebrainPycApiClient::HTTP_GET:
+                break;
+            default:
+                throw new \InvalidArgumentException('Invalid http method: ' . $httpMethod);
+        }
+
+        $startTime = microtime(true);
+        $response = curl_exec($curl);
+        $endTime = microtime(true);
+
+        if ($response === false) {
+            $executionTime = $endTime - $startTime;
+            $curlErrorNumber = curl_errno($curl);
+            $curlErrorMessage = 'Curl error: ' . curl_error($curl);
+
+            if ($this->isConnectTimeoutError($curlErrorNumber, $executionTime)) {
+                curl_close($curl);
+                throw new CurlException(
+                    sprintf(
+                        'Unable to connect to the PayoCity Payment HUB. (Error %d: %s). Execution time: %.2fs',
+                        $curlErrorNumber,
+                        $curlErrorMessage,
+                        $executionTime
+                    )
+                );
+            }
+
+            curl_close($curl);
+            throw new ApiException(
+                sprintf('Curl error %d: %s', $curlErrorNumber, $curlErrorMessage),
+                $curlErrorNumber
+            );
+        }
+
+        // extract header
+        $headerSize = curl_getinfo($curl, CURLINFO_HEADER_SIZE);
+        $header = substr($response, 0, $headerSize);
+        $headers = $this->getHeaders($header);
+
+        // extract body
+        $httpBody = substr($response, $headerSize);
+
+        $statusCode = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        curl_close($curl);
+
+        return $this->parseResponseBody($response, $headers, $statusCode, $httpBody);
+    }
+
+    /**
+     * The version number for the underlying http client, if available.
+     *
+     * @example Guzzle/7.7
+     *
+     * @return string|null
+     */
+    public function versionString()
+    {
+        return 'Curl/*';
+    }
+
+    /**
+     * Whether this http adapter provides a debugging mode. If debugging mode is enabled, the
+     * request will be included in the ApiException.
+     *
+     * @return false
+     */
+    public function supportsDebugging()
+    {
+        return false;
+    }
+
+    /**
+     * @param int          $curlErrorNumber
+     * @param string|float $executionTime
+     *
+     * @return bool
+     */
+    private function isConnectTimeoutError($curlErrorNumber, $executionTime)
+    {
+        $connectErrors = [
+            \CURLE_COULDNT_RESOLVE_HOST => true,
+            \CURLE_COULDNT_CONNECT => true,
+            \CURLE_SSL_CONNECT_ERROR => true,
+            \CURLE_GOT_NOTHING => true,
+        ];
+
+        if (isset($connectErrors[$curlErrorNumber])) {
+            return true;
+        }
+
+        if ($curlErrorNumber === \CURLE_OPERATION_TIMEOUTED) {
+            if ($executionTime > self::DEFAULT_TIMEOUT) {
+                return false;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param string $response
+     * @param array  $headers
+     * @param int    $statusCode
+     * @param string $httpBody
+     *
+     * @return \Psr\Http\Message\ResponseInterface|null
+     *
+     * @throws \CodebrainPyc\Hub\Exceptions\ApiException
+     */
+    private function parseResponseBody($response, $headers, $statusCode, $httpBody): ?ResponseInterface
+    {
+        if (empty($response)) {
+            if ($statusCode === self::HTTP_NO_CONTENT) {
+                return null;
+            }
+
+            throw new ApiException(
+                sprintf('No response body found. HTTP Status: %d', $statusCode),
+                $statusCode
+            );
+        }
+
+        if ($statusCode >= 400) {
+            throw new ApiException(
+                sprintf('HTTP %d: %s', $statusCode, mb_substr($httpBody, 0, 200)),
+                $statusCode
+            );
+        }
+
+        // Convert flat header array to PSR-7 format (each value wrapped in an array)
+        $psr7Headers = [];
+        foreach ($headers as $name => $value) {
+            if ($name !== 'http_code') {
+                $psr7Headers[$name] = [$value];
+            }
+        }
+
+        return new Response($statusCode, $psr7Headers, $httpBody);
+    }
+
+    private function parseHeaders($headers)
+    {
+        $result = [];
+
+        foreach ($headers as $key => $value) {
+            $result[] = $key . ': ' . $value;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get the headers from the response.
+     *
+     * @param string $respHeaders
+     *
+     * @return array
+     */
+    private function getHeaders($respHeaders)
+    {
+        $headers = [];
+
+        $headerText = substr($respHeaders, 0, strpos($respHeaders, "\r\n\r\n"));
+
+        foreach (explode("\r\n", $headerText) as $i => $line) {
+            if ($i === 0) {
+                $headers['http_code'] = $line;
+            } else {
+                list($key, $value) = explode(': ', $line);
+
+                $headers[strtolower($key)] = $value;
+            }
+        }
+
+        return $headers;
+    }
+}
