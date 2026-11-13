@@ -5,6 +5,7 @@ namespace Codebrainbv\Smartpay\Http;
 use Codebrainbv\Smartpay\CodebrainPycApiClient;
 use Codebrainbv\Smartpay\Exceptions\ApiException;
 use Codebrainbv\Smartpay\Exceptions\CurlException;
+use Codebrainbv\Smartpay\SmartpayClient;
 use Composer\CaBundle\CaBundle;
 use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\ResponseInterface;
@@ -42,10 +43,10 @@ final class CurlHttp implements HttpInterface
      * @param array  $headers
      * @param string $httpBody
      *
-     * @return \Psr\Http\Message\ResponseInterface|null
+     * @return ResponseInterface|null
      *
-     * @throws \Codebrainbv\Smartpay\Exceptions\ApiException
-     * @throws \Codebrainbv\Smartpay\Exceptions\CurlException
+     * @throws ApiException
+     * @throws CurlException
      */
     public function send($httpMethod, $url, $headers, $httpBody): ?ResponseInterface
     {
@@ -59,7 +60,9 @@ final class CurlHttp implements HttpInterface
             }
         }
 
-        throw new CurlException('Unable to connect to the Codebrain HUB. Maximum number of retries (' . self::MAX_RETRIES . ') reached.');
+        throw new CurlException(
+            'Unable to connect to the Rabo Smart Pay. Maximum number of retries (' . self::MAX_RETRIES . ') reached.'
+        );
     }
 
     /**
@@ -70,7 +73,7 @@ final class CurlHttp implements HttpInterface
      *
      * @return \stdClass|void|null
      *
-     * @throws \Codebrainbv\Smartpay\Exceptions\ApiException
+     * @throws ApiException
      */
     private function attemptRequest($httpMethod, $url, $headers, $httpBody)
     {
@@ -99,12 +102,12 @@ final class CurlHttp implements HttpInterface
         curl_setopt($curl, CURLOPT_CAINFO, CaBundle::getBundledCaBundlePath());
 
         switch ($httpMethod) {
-            case CodebrainPycApiClient::HTTP_POST:
+            case SmartpayClient::HTTP_POST:
                 curl_setopt($curl, CURLOPT_POST, true);
                 curl_setopt($curl, CURLOPT_POSTFIELDS, $httpBody);
 
                 break;
-            case CodebrainPycApiClient::HTTP_GET:
+            case SmartpayClient::HTTP_GET:
                 break;
             default:
                 throw new \InvalidArgumentException('Invalid http method: ' . $httpMethod);
@@ -120,10 +123,9 @@ final class CurlHttp implements HttpInterface
             $curlErrorMessage = 'Curl error: ' . curl_error($curl);
 
             if ($this->isConnectTimeoutError($curlErrorNumber, $executionTime)) {
-                curl_close($curl);
                 throw new CurlException(
                     sprintf(
-                        'Unable to connect to the PayoCity Payment HUB. (Error %d: %s). Execution time: %.2fs',
+                        'Unable to connect to the Rabo Smart Pay. (Error %d: %s). Execution time: %.2fs',
                         $curlErrorNumber,
                         $curlErrorMessage,
                         $executionTime
@@ -131,7 +133,6 @@ final class CurlHttp implements HttpInterface
                 );
             }
 
-            curl_close($curl);
             throw new ApiException(
                 sprintf('Curl error %d: %s', $curlErrorNumber, $curlErrorMessage),
                 $curlErrorNumber
@@ -147,7 +148,6 @@ final class CurlHttp implements HttpInterface
         $httpBody = substr($response, $headerSize);
 
         $statusCode = curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
-        curl_close($curl);
 
         return $this->parseResponseBody($response, $headers, $statusCode, $httpBody);
     }
@@ -211,9 +211,9 @@ final class CurlHttp implements HttpInterface
      * @param int    $statusCode
      * @param string $httpBody
      *
-     * @return \Psr\Http\Message\ResponseInterface|null
+     * @return ResponseInterface|null
      *
-     * @throws \CodebrainPyc\Hub\Exceptions\ApiException
+     * @throws ApiException
      */
     private function parseResponseBody($response, $headers, $statusCode, $httpBody): ?ResponseInterface
     {

@@ -6,6 +6,8 @@ use Codebrainbv\Smartpay\Exceptions\ApiException;
 use Codebrainbv\Smartpay\Http;
 use Codebrainbv\Smartpay\Endpoints\AuthenticationEndpoint;
 use Codebrainbv\Smartpay\Endpoints\OrderEndpoint;
+use Codebrainbv\Smartpay\Endpoints\StatusEndpoint;
+use Codebrainbv\Smartpay\Endpoints\WebhookEndpoint;
 
 class SmartpayClient
 {
@@ -13,12 +15,6 @@ class SmartpayClient
      * Version of our client.
      */
     public const CLIENT_VERSION = '0.0.1';
-
-    /**
-     * Version of the API.
-     */
-    public const API_VERSION = 'v2';
-
 
     /**
      * Poduction endpoint of the remote API.
@@ -97,6 +93,20 @@ class SmartpayClient
      */
     public $order;
 
+    /**
+     * RESTful Status resource.
+     *
+     * @var StatusEndpoint
+     */
+    public $status;
+
+    /**
+     * RESTful Webhook resource.
+     *
+     * @var WebhookEndpoint
+     */
+    public $webhook;
+
     public function __construct($httpClient = null, $httpAdapterPicker = null)
     {
         $httpAdapterPicker = $httpAdapterPicker ?: new Http\HttpPicker();
@@ -108,7 +118,9 @@ class SmartpayClient
     public function initializeEndpoints()
     {
         $this->auth = new AuthenticationEndpoint($this);
-        // $this->order = new OrderEndpoint($this);
+        $this->order = new OrderEndpoint($this);
+        $this->status = new StatusEndpoint($this);
+        $this->webhook = new WebhookEndpoint($this);
     }
 
     /**
@@ -200,7 +212,7 @@ class SmartpayClient
      */
     public function doHttpCall($httpMethod, $apiPath, $httpBody = null)
     {
-        $url = $this->getBaseUrl() . '/' . self::API_VERSION . '/' . $apiPath;
+        $url = $this->getBaseUrl() . '/' . $apiPath;
 
         return $this->performHttpCall($httpMethod, $url, $httpBody);
     }
@@ -260,24 +272,6 @@ class SmartpayClient
 
         $response = $this->httpClient->send($httpMethod, $url, $headers, $httpBody);
 
-        // Check if x-signature headers exists and the hash is correct
-        if (!isset($response->headers['x-signature'])) {
-            throw new ApiException('Missing signature header.');
-        } else {
-            // Get the signature from the response, with correction for Guzzle 6
-            if (is_array($response->headers['x-signature'])) {
-                $signatureHeader = $response->headers['x-signature'][0];
-            } else {
-                $signatureHeader = $response->headers['x-signature'];
-            }
-
-            $signature = hash_hmac('sha512', json_encode($response->body), $this->signingKey);
-
-            if (!hash_equals($signature, $signatureHeader)) {
-                throw new ApiException('Invalid signature.');
-            }
-        }
-
         return $response->body;
     }
 
@@ -326,6 +320,29 @@ class SmartpayClient
      */
     public function validateReturn($data)
     {
+        foreach (['status', 'order_id', 'signature'] as $parameter) {
+            if (empty($data[$parameter]) || !is_string($data[$parameter])) {
+                throw new ApiException(
+                    "Missing or invalid required parameter: {$parameter}"
+                );
+            }
+        }
+
+        $signatureString = $data['order_id'] . ',' . $data['status'];
+
+        $expectedSignature = hash_hmac(
+            'sha512',
+            $signatureString,
+            base64_decode($this->signingKey)
+        );
+
+        if (!hash_equals($data['signature'], $expectedSignature)) {
+            throw new ApiException(
+                "Invalid signature"
+            );
+        }
+
+        return true;
     }
 
     /**
@@ -339,6 +356,37 @@ class SmartpayClient
      */
     public function validateWebhook($jsonData)
     {
+        $postData = json_decode($jsonData, true);
+
+        foreach (['authentication', 'expiry', 'eventName', 'poiId', 'signature'] as $parameter) {
+            if (empty($postData[$parameter]) || !is_scalar($postData[$parameter])) {
+                throw new ApiException(
+                    "Missing or invalid required parameter: {$parameter}"
+                );
+            }
+        }
+
+        $signatureString = $postData['authentication']
+            . ','
+            . $postData['expiry']
+            . ','
+            . $postData['eventName']
+            . ','
+            . $postData['poiId'];
+
+        $expectedSignature = hash_hmac(
+            'sha512',
+            $signatureString,
+            base64_decode($this->signingKey)
+        );
+
+        if (!hash_equals($postData['signature'], $expectedSignature)) {
+            throw new ApiException(
+                "Invalid signature"
+            );
+        }
+
+        return true;
     }
 
     private function getBaseUrl(): string

@@ -32,11 +32,78 @@ abstract class AbstractEndpoint
         $this->client = $api;
     }
 
-    protected function gatekeeper()
+    /**
+     * @return string
+     */
+    protected function buildQueryString(array $filters)
+    {
+        if (empty($filters)) {
+            return '';
+        }
+
+        foreach ($filters as $key => $value) {
+            if ($value === true) {
+                $filters[$key] = 'true';
+            }
+
+            if ($value === false) {
+                $filters[$key] = 'false';
+            }
+        }
+
+        return '?' . http_build_query($filters, '', '&');
+    }
+
+    /**
+     * @throws ApiException
+     */
+    protected function restCreate(array $body, array $filters)
+    {
+        $result = $this->client->doHttpCall(
+            self::REST_CREATE,
+            $this->getResourcePath() . $this->buildQueryString($filters),
+            $this->parseRequestBody($body)
+        );
+
+        return ResourceFactory::createFromApiResult($result, $this->getResourceObject());
+    }
+
+    /**
+     * Retrieves a single object from the REST API using the GET method, for instance the status pull.
+     *
+     * @param string $id id of the object to retrieve
+     *
+     * @throws ApiException
+     */
+    protected function restRead($id)
+    {
+        if (empty($id)) {
+            throw new ApiException('Invalid resource id.');
+        }
+
+        $id = urlencode($id);
+        $result = $this->client->doHttpCall(
+            self::REST_READ,
+            "{$this->getResourcePath()}/{$id}"
+        );
+
+        return ResourceFactory::createFromApiResult($result, $this->getResourceObject());
+    }
+
+    /**
+     * Retrieves a single object from the REST API using the GET method, for instance the status pull.
+     *
+     * @throws ApiException
+     *
+     * @param array $filters
+     *
+     * @return BaseResource
+     */
+    protected function restGet(array $filters)
     {
         $result = $this->client->doAuthHttpCall(
             self::REST_READ,
-            "{$this->getResourcePath()}"
+            "{$this->getResourcePath()}" . $this->buildQueryString($filters)
         );
 
         return ResourceFactory::createFromApiResult($result, $this->getResourceObject());
@@ -61,6 +128,18 @@ abstract class AbstractEndpoint
         }
 
         return $this->resourcePath;
+    }
+
+    /**
+     * @return string|null
+     */
+    protected function parseRequestBody(array $body)
+    {
+        if (empty($body)) {
+            return null;
+        }
+
+        return @json_encode($body);
     }
 
     /**

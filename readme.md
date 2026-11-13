@@ -35,3 +35,29 @@ By far the easiest way to install the HUB API client is to require it with [Comp
 ## Access Token ##
 
 
+
+
+
+## Left out for now, can be requested
+
+# Billing Detail && Shipping Detail
+
+This structure contains address details and is typically used
+in specifying billing and shipping details of an order.
+
+The array should contain keys such as:
+'firstName', 'middleName', 'lastName', 'street',
+'houseNumber', 'houseNumberAddition', 'postalCode',
+'city', and 'countryCode'.
+Each key should have a corresponding value representing the
+respective address detail.
+
+
+# Order Items
+
+An optional list of zero or more order items.
+
+The array should contain keys such as:
+'amount', 'category', 'description', 'id', 'name', 'quantity', 'tax',  'vatCategory'
+Each key should have a corresponding value representing the
+respective order line.

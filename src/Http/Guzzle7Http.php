@@ -29,7 +29,7 @@ final class Guzzle7Http implements HttpInterface
     public const HTTP_NO_CONTENT = 204;
 
     /**
-     * @var \GuzzleHttp\ClientInterface
+     * @var ClientInterface
      */
     private $httpClient;
 
@@ -72,14 +72,14 @@ final class Guzzle7Http implements HttpInterface
      *
      * @return \stdClass|null
      *
-     * @throws \Codebrainbv\Smartpay\Exceptions\ApiException
+     * @throws ApiException
      */
     public function send($httpMethod, $url, $headers, $httpBody)
     {
         $request = new Request($httpMethod, $url, $headers, $httpBody);
 
         try {
-            $response = $this->httpClient->send($request, ['http_errors' => false]);
+            $response = $this->httpClient->send($request, ['http_errors' => true]);
         } catch (GuzzleException $e) {
             // Only include the request in the ApiException if debugging is enabled.
             if (!$this->debugging) {
@@ -124,7 +124,9 @@ final class Guzzle7Http implements HttpInterface
     }
 
     /**
-     * Disable debugging for the client. Disable debugging prevents the request from being added to the ApiException. But its disabled by default.
+     * Disable debugging for the client.
+     * Disable debugging prevents the request from being added to the ApiException.
+     * But its disabled by default.
      */
     public function disableDebugging()
     {
@@ -157,7 +159,7 @@ final class Guzzle7Http implements HttpInterface
         $object->body = @json_decode($body);
 
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new ApiException("Unable to decode PayoCity Payment HUB response: '{$body}'.");
+            throw new ApiException("Unable to decode Rabo response: '{$body}'.");
         }
 
         if ($response->getStatusCode() >= 400) {

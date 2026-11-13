@@ -29,6 +29,6 @@ class AuthenticationEndpoint extends AbstractEndpoint
      */
     public function get()
     {
-        return $this->gatekeeper();
+        return $this->restGet([]);
     }
 }

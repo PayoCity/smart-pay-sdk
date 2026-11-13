@@ -38,7 +38,9 @@ abstract class BaseResource
         $properties = [];
 
         foreach (static::$allowedProperties as $property) {
-            $properties[$property] = $this->$property;
+            if (property_exists($this, $property) && isset($this->$property)) {
+                $properties[$property] = $this->$property;
+            }
         }
 
         return $properties;

@@ -5,12 +5,7 @@ namespace Codebrainbv\Smartpay\Exceptions;
 class ApiException extends \Exception
 {
     /**
-     * @var string
-     */
-    protected $field;
-
-    /**
-     * @var string
+     * @var string|null
      */
     protected $plainMessage;
 
@@ -25,6 +20,20 @@ class ApiException extends \Exception
     protected $response;
 
     /**
+     * API error code from the response
+     *
+     * @var string|int|null
+     */
+    protected $apiErrorCode;
+
+    /**
+     * API error message from the response
+     *
+     * @var string|null
+     */
+    protected $apiErrorMessage;
+
+    /**
      * ISO8601 representation of the moment this exception was thrown.
      *
      * @var \DateTimeImmutable
@@ -35,6 +44,7 @@ class ApiException extends \Exception
      * @param string                                   $message
      * @param int                                      $code
      * @param string|null                              $field
+     * @param string|int|null                          $error
      * @param \Psr\Http\Message\RequestInterface|null  $request
      * @param \Psr\Http\Message\ResponseInterface|null $response
      * @param \Throwable|null                          $previous
@@ -51,16 +61,11 @@ class ApiException extends \Exception
         $previous = null
     ) {
         $this->plainMessage = $message;
-
+        $this->apiErrorCode = $error;
         $this->raisedAt = new \DateTimeImmutable();
 
         $formattedRaisedAt = $this->raisedAt->format(\DateTime::ISO8601_EXPANDED);
         $message = "[{$formattedRaisedAt}] " . $message;
-
-        if (!empty($field)) {
-            $this->field = (string) $field;
-            $message .= ". Field: {$this->field}";
-        }
 
         if (!empty($response)) {
             $this->response = $response;
@@ -91,30 +96,27 @@ class ApiException extends \Exception
     {
         $object = static::parseResponseBody($response);
 
-        $field = null;
-        $error = null;
-        if (!empty($object->field)) {
-            $field = $object->field;
-            $error = $object->error;
+        $errorCode = null;
+        $errorMessage = null;
+        if (!empty($object->errorCode)) {
+            $errorCode = $object->errorCode;
+            $errorMessage = $object->errorMessage;
         }
 
-        return new self(
-            "Error executing API call ({$field}: {$error})",
+        $exception = new self(
+            "Error executing API call ({$errorCode}: {$errorMessage})",
             $response->getStatusCode(),
-            $field,
-            $error,
+            $errorCode,
+            $errorMessage,
             $request,
             $response,
             $previous
         );
-    }
 
-    /**
-     * @return string|null
-     */
-    public function getField()
-    {
-        return $this->field;
+        $exception->apiErrorCode = $errorCode;
+        $exception->apiErrorMessage = $errorMessage;
+
+        return $exception;
     }
 
     /**
@@ -166,7 +168,7 @@ class ApiException extends \Exception
 
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new \Codebrainbv\Smartpay\Exceptions\ApiException(
-                "Unable to decode PayoCity Payment HUB response: '{$body}'."
+                "Unable to decode Rabo Smart Pay response: '{$body}'."
             );
         }
 
@@ -181,5 +183,49 @@ class ApiException extends \Exception
     public function getPlainMessage()
     {
         return $this->plainMessage;
+    }
+
+    /**
+     * Get the API error code.
+     *
+     * @return string|int|null
+     */
+    public function getApiErrorCode()
+    {
+        return $this->apiErrorCode;
+    }
+
+    /**
+     * Get the API error message.
+     *
+     * @return string|null
+     */
+    public function getApiErrorMessage()
+    {
+        return $this->apiErrorMessage;
+    }
+
+    /**
+     * Get a nicely formatted error message for display.
+     *
+     * @return string
+     */
+    public function getFormattedError()
+    {
+        $output = "SmartPay API Error\n";
+
+        if ($this->apiErrorCode) {
+            $output .= "Error Code: " . $this->apiErrorCode . "\n";
+        }
+
+        if ($this->apiErrorMessage) {
+            $output .= "Message: " . $this->apiErrorMessage . "\n";
+        }
+
+        if ($this->raisedAt) {
+            $output .= "Time: " . $this->raisedAt->format('Y-m-d H:i:s') . "\n";
+        }
+
+        return $output;
     }
 }
