@@ -123,7 +123,7 @@ class SmartpayClient
         $refreshToken = trim($refreshToken);
 
         // Refresh token has to be atleast 450 characters long.
-        if (!preg_match('/^[a-zA-Z0-9#\/="]{450,}$/', $refreshToken)) {
+        if (!preg_match('/^([a-zA-Z0-9-_.=]{450,}$)+/', $refreshToken)) {
             throw new \InvalidArgumentException(
                 'Refresh token cannot be empty, or has to be longer then 450 characters.'
             );
@@ -146,13 +146,20 @@ class SmartpayClient
         $signingKey = trim($signingKey);
 
         // Signing key has to be atleast 40 characters long.
-        if (!preg_match('/^[a-zA-Z0-9#\/="]{40,}$/', $signingKey)) {
+        if (!preg_match('/^([a-zA-Z0-9#\/=+"]{40,}$)+/', $signingKey)) {
             throw new \InvalidArgumentException(
                 'Signing key cannot be empty, or has to be longer then 40 characters.'
             );
         }
 
         $this->signingKey = $signingKey;
+
+        return $this;
+    }
+
+    public function setSandbox($sandbox)
+    {
+        $this->sandbox = (bool) $sandbox;
 
         return $this;
     }
@@ -211,7 +218,7 @@ class SmartpayClient
      */
     public function doAuthHttpCall($httpMethod, $apiPath, $httpBody = null)
     {
-        $url = $this->getBaseUrl() . '/' . self::API_VERSION . '/' . $apiPath;
+        $url = $this->getBaseUrl() . '/' . $apiPath;
 
         return $this->performAuthHttpCall($httpMethod, $url, $httpBody);
     }

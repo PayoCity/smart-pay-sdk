@@ -32,9 +32,9 @@ abstract class AbstractEndpoint
         $this->client = $api;
     }
 
-    protected function get()
+    protected function gatekeeper()
     {
-        $result = $this->client->doHttpCall(
+        $result = $this->client->doAuthHttpCall(
             self::REST_READ,
             "{$this->getResourcePath()}"
         );

@@ -2,7 +2,7 @@
 
 namespace Codebrainbv\Smartpay\Endpoints;
 
-use Codebrainbv\Smartpay\Resource\Authentication;
+use Codebrainbv\Smartpay\Resources\Authentication;
 use Codebrainbv\Smartpay\Exceptions\ApiException;
 
 class AuthenticationEndpoint extends AbstractEndpoint
@@ -19,16 +19,16 @@ class AuthenticationEndpoint extends AbstractEndpoint
     }
 
     /**
-     * Retreive an accesstoken from the Codebrain HUB.
+     * Retrieve an accesstoken from the Rabo Smart Pay.
      *
-     * Will throw a ApiException if the shop cannot be found, or an accesstoken could not be generated.
+     * Will throw a ApiException if  an accesstoken could not be generated.
      *
      * @return Authentication
      *
      * @throws ApiException
      */
-    public function get(array $parameters = [])
+    public function get()
     {
-        return $this->get($parameters);
+        return $this->gatekeeper();
     }
 }
