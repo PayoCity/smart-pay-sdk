@@ -89,6 +89,27 @@ abstract class AbstractEndpoint
 
         return ResourceFactory::createFromApiResult($result, $this->getResourceObject());
     }
+    /**
+     * Retrieves webhook data from the Rabo Smart Pay API.
+     *
+     * @param string $authentication authentication token of the webhook
+     *
+     * @throws ApiException
+     */
+    protected function restWebhook($authentication)
+    {
+        if (empty($authentication)) {
+            throw new ApiException('Invalid authentication token.');
+        }
+
+        $result = $this->client->doWebhookHttpCall(
+            self::REST_READ,
+            "{$this->getResourcePath()}",
+            $authentication
+        );
+
+        return ResourceFactory::createFromApiResult($result, $this->getResourceObject());
+    }
 
     /**
      * Retrieves a single object from the REST API using the GET method, for instance the status pull.

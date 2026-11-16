@@ -19,12 +19,12 @@ class WebhookEndpoint extends AbstractEndpoint
     }
 
 
-    public function get(string $omnikassaOrderId)
+    public function get(array $params)
     {
-        if (empty($omnikassaOrderId)) {
-            throw new ApiException("Missing order ID: '{$omnikassaOrderId}'.");
+        if (empty($params['authentication'])) {
+            throw new ApiException("Missing authentication token in webhook data.");
         }
 
-        return $this->restRead($omnikassaOrderId);
+        return $this->restWebhook($params['authentication']);
     }
 }

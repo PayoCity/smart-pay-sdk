@@ -124,6 +124,16 @@ class SmartpayClient
     }
 
     /**
+     * Get the HTTP client instance.
+     *
+     * @return \Codebrainbv\Smartpay\Http\HttpInterface
+     */
+    public function getHttpClient()
+    {
+        return $this->httpClient;
+    }
+
+    /**
      * @param string $refreshToken the Point of Sale's refresh token
      *
      * @return SmartpayClient
@@ -238,9 +248,6 @@ class SmartpayClient
     /**
      * Perform a http call to a full url. This method is used by the resource specific classes.
      *
-     * @see $payments
-     * @see $isuers
-     *
      * @param string      $httpMethod
      * @param string      $url
      * @param string|null $httpBody
@@ -271,6 +278,43 @@ class SmartpayClient
         }
 
         $response = $this->httpClient->send($httpMethod, $url, $headers, $httpBody);
+
+        return $response->body;
+    }
+
+    /**
+     * Perform a webhook http call to a full url. This method is by the webhook endpoint only.
+     *
+     * @see $payments
+     * @see $isuers
+     *
+     * @param string      $httpMethod
+     * @param string      $apiPath
+     * @param string      $authentication
+     *
+     * @return \stdClass|null
+     *
+     * @throws ApiException
+     */
+    public function doWebhookHttpCall($httpMethod, $apiPath, $authentication)
+    {
+        if (empty($authentication)) {
+            throw new ApiException(
+                'You have not provided an authentication token for the webhook.'
+            );
+        }
+
+        $headers = [
+            'Accept' => 'application/json',
+            'Authorization' => "Bearer {$authentication}",
+        ];
+
+        if (function_exists('php_uname')) {
+            $headers['X-Codebrain-Client'] = php_uname();
+        }
+
+        $url = $this->getBaseUrl() . '/' . $apiPath;
+        $response = $this->httpClient->send($httpMethod, $url, $headers, null);
 
         return $response->body;
     }
@@ -350,7 +394,7 @@ class SmartpayClient
      *
      * @param string $jsonData
      *
-     * @return bool
+     * @return array array containing the webhook payload
      *
      * @throws ApiException
      */
@@ -386,7 +430,7 @@ class SmartpayClient
             );
         }
 
-        return true;
+        return $postData;
     }
 
     private function getBaseUrl(): string

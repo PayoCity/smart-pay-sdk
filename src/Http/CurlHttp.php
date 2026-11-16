@@ -38,6 +38,53 @@ final class CurlHttp implements HttpInterface
     public const DELAY_INCREASE_MS = 1000;
 
     /**
+     * Enable debugging mode for curl requests.
+     * @var bool
+     */
+    protected $debugMode = false;
+
+    /**
+     * File handle for debug output.
+     * @var resource|null
+     */
+    protected $debugFile = null;
+
+    /**
+     * Enable debugging for curl requests.
+     *
+     * @param bool   $enabled
+     * @param string $debugFilePath Optional path to log file. Defaults to stderr.
+     *
+     * @return self
+     */
+    public function setDebugMode($enabled, $debugFilePath = null)
+    {
+        $this->debugMode = (bool) $enabled;
+
+        if ($enabled && $debugFilePath) {
+            $this->debugFile = fopen($debugFilePath, 'a');
+            if ($this->debugFile === false) {
+                throw new \RuntimeException("Could not open debug file: {$debugFilePath}");
+            }
+        } elseif (!$enabled && $this->debugFile) {
+            fclose($this->debugFile);
+            $this->debugFile = null;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Check if debug mode is enabled.
+     *
+     * @return bool
+     */
+    public function isDebugMode()
+    {
+        return $this->debugMode;
+    }
+
+    /**
      * @param string $httpMethod
      * @param string $url
      * @param array  $headers
@@ -100,6 +147,12 @@ final class CurlHttp implements HttpInterface
         curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($curl, CURLOPT_HEADER, true);
         curl_setopt($curl, CURLOPT_CAINFO, CaBundle::getBundledCaBundlePath());
+
+        if ($this->debugMode) {
+            curl_setopt($curl, CURLOPT_VERBOSE, true);
+            $debugFile = $this->debugFile ?: fopen('php://stderr', 'w');
+            curl_setopt($curl, CURLOPT_STDERR, $debugFile);
+        }
 
         switch ($httpMethod) {
             case SmartpayClient::HTTP_POST:
