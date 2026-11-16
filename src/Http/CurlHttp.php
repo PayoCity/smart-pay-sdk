@@ -138,7 +138,10 @@ final class CurlHttp implements HttpInterface
             throw new CurlException('Failed to initialize cURL session.');
         }
 
-        $headers['Content-Type'] = 'application/json';
+        // Only set Content-Type if not already set
+        if (!isset($headers['Content-Type'])) {
+            $headers['Content-Type'] = 'application/json';
+        }
 
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($curl, CURLOPT_HTTPHEADER, $this->parseHeaders($headers));

@@ -307,6 +307,7 @@ class SmartpayClient
         $headers = [
             'Accept' => 'application/json',
             'Authorization' => "Bearer {$authentication}",
+            'Content-Type' => 'application/json',
         ];
 
         if (function_exists('php_uname')) {
