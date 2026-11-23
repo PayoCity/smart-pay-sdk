@@ -10,9 +10,21 @@ class ResourceFactory
      * Create resource object from Api result, filtered by properties that should exist.
      *
      * @param object $apiResult
+     *
+     * @return BaseResource|BaseResource[]
      */
     public static function createFromApiResult($apiResult, BaseResource $resource)
     {
+        if (property_exists($apiResult, 'orderResults') && is_array($apiResult->orderResults)) {
+            $resources = [];
+
+            foreach ($apiResult->orderResults as $order) {
+                $resources[] = self::createFromApiResult((object) $order, clone $resource);
+            }
+
+            return $resources;
+        }
+
         // Unwrap nested 'order' object if present (for Status endpoint)
         if (property_exists($apiResult, 'order') && is_object($apiResult->order)) {
             $apiResult = $apiResult->order;
@@ -26,7 +38,7 @@ class ResourceFactory
             if (property_exists($apiResult, $property)) {
                 $value = $apiResult->{$property};
                 // Convert stdClass to array for array-typed properties
-                if (is_object($value)) {
+                if (is_object($value) || is_array($value)) {
                     $value = self::objectToArray($value);
                 }
                 $resource->{$property} = $value;

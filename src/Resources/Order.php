@@ -3,7 +3,7 @@
 namespace Codebrainbv\Smartpay\Resources;
 
 use Codebrainbv\Smartpay\Resources\BaseResource;
-use Codebrainbv\Smartpay\States\PaymentStates;
+use Codebrainbv\Smartpay\Enums\PaymentStates;
 
 class Order extends BaseResource
 {

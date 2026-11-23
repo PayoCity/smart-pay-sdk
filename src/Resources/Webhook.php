@@ -3,7 +3,7 @@
 namespace Codebrainbv\Smartpay\Resources;
 
 use Codebrainbv\Smartpay\Resources\BaseResource;
-use Codebrainbv\Smartpay\States\PaymentStates;
+use Codebrainbv\Smartpay\Enums\PaymentStates;
 use Codebrainbv\Smartpay\Enums\PaymentMethods;
 
 class Webhook extends BaseResource
@@ -13,7 +13,7 @@ class Webhook extends BaseResource
      *
      * @var string|null
      */
-    public ?string $id;
+    public ?string $omnikassaOrderId;
 
     /**
      * The merchant order ID provided when creating the order.
@@ -28,7 +28,7 @@ class Webhook extends BaseResource
      *
      * @var string
      */
-    public string $status;
+    public string $orderStatus;
 
     /**
      * The total amount of the order including currency.
@@ -52,9 +52,9 @@ class Webhook extends BaseResource
      * @var array
      */
     protected static $allowedProperties = [
-        'id',
+        'omnikassaOrderId',
         'merchantOrderId',
-        'status',
+        'orderStatus',
         'totalAmount',
         'transactions'
     ];
@@ -66,7 +66,7 @@ class Webhook extends BaseResource
      */
     public function isCompleted()
     {
-        return $this->status === PaymentStates::STATUS_PAID;
+        return $this->orderStatus === PaymentStates::STATUS_PAID->value;
     }
 
     /**
@@ -76,7 +76,7 @@ class Webhook extends BaseResource
      */
     public function isPending()
     {
-        return $this->status === PaymentStates::STATUS_OPEN;
+        return $this->orderStatus === PaymentStates::STATUS_OPEN->value;
     }
 
     /**
@@ -86,7 +86,7 @@ class Webhook extends BaseResource
      */
     public function isFailed()
     {
-        return $this->status === PaymentStates::STATUS_FAILED;
+        return $this->orderStatus === PaymentStates::STATUS_FAILED->value;
     }
 
     /**
@@ -96,7 +96,7 @@ class Webhook extends BaseResource
      */
     public function isCancelled()
     {
-        return $this->status === PaymentStates::STATUS_CANCELED;
+        return $this->orderStatus === PaymentStates::STATUS_CANCELED->value;
     }
 
     /**
@@ -106,7 +106,7 @@ class Webhook extends BaseResource
      */
     public function getId()
     {
-        return $this->id ?? null;
+        return $this->omnikassaOrderId ?? null;
     }
 
     /**
@@ -126,7 +126,7 @@ class Webhook extends BaseResource
      */
     public function getStatus()
     {
-        return $this->status ?? null;
+        return $this->orderStatus ?? null;
     }
 
     /**
@@ -187,7 +187,7 @@ class Webhook extends BaseResource
         }
 
         foreach ($this->transactions as $transaction) {
-            if (!empty($transaction['status']) && $transaction['status'] === PaymentStates::STATUS_PAID) {
+            if (!empty($transaction['status']) && $transaction['status'] === 'SUCCESS') {
                 return $transaction;
             }
         }
@@ -236,7 +236,7 @@ class Webhook extends BaseResource
     public function getTransactionCreatedAt()
     {
         $transaction = $this->getSuccessfulTransaction();
-        return $transaction['createdAt'] ?? null;
+        return $transaction['startTime'] ?? null;
     }
 
     /**

@@ -66,7 +66,7 @@ class Status extends BaseResource
      */
     public function isCompleted()
     {
-        return $this->status === PaymentStates::STATUS_PAID;
+        return $this->status === PaymentStates::STATUS_PAID->value;
     }
 
     /**
@@ -76,7 +76,7 @@ class Status extends BaseResource
      */
     public function isPending()
     {
-        return $this->status === PaymentStates::STATUS_OPEN;
+        return $this->status === PaymentStates::STATUS_OPEN->value;
     }
 
     /**
@@ -86,7 +86,7 @@ class Status extends BaseResource
      */
     public function isFailed()
     {
-        return $this->status === PaymentStates::STATUS_FAILED;
+        return $this->status === PaymentStates::STATUS_FAILED->value;
     }
 
     /**
@@ -96,7 +96,7 @@ class Status extends BaseResource
      */
     public function isCancelled()
     {
-        return $this->status === PaymentStates::STATUS_CANCELED;
+        return $this->status === PaymentStates::STATUS_CANCELED->value;
     }
 
     /**
@@ -187,7 +187,7 @@ class Status extends BaseResource
         }
 
         foreach ($this->transactions as $transaction) {
-            if (!empty($transaction['status']) && $transaction['status'] === PaymentStates::STATUS_PAID) {
+            if (!empty($transaction['status']) && $transaction['status'] === 'SUCCESS') {
                 return $transaction;
             }
         }
@@ -236,7 +236,7 @@ class Status extends BaseResource
     public function getTransactionCreatedAt()
     {
         $transaction = $this->getSuccessfulTransaction();
-        return $transaction['createdAt'] ?? null;
+        return $transaction['startTime'] ?? null;
     }
 
     /**
